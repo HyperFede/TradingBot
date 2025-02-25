@@ -1,0 +1,23 @@
+Backtesting @ git+https://github.com/kernc/backtesting.py.git@0ce24d80b1bcb8120d95d31dc3bb351b1052a27d
+bokeh==3.6.2
+contourpy==1.3.1
+cycler==0.12.1
+fonttools==4.55.3
+Jinja2==3.1.5
+kiwisolver==1.4.8
+MarkupSafe==3.0.2
+matplotlib==3.10.0
+MetaTrader5==5.0.4738
+numpy==2.2.1
+packaging==24.2
+pandas==2.2.3
+pillow==11.0.0
+pyparsing==3.2.0
+python-dateutil==2.9.0.post0
+pytz==2024.2
+PyYAML==6.0.2
+six==1.17.0
+TA-Lib @ file:///C:/Users/feder/Documents/GitHub/TradingBot/TA_Lib-0.4.29-cp311-cp311-win_amd64.whl#sha256=aab5075b1c6f2482c80e4561bb44b888815ca41affe519ad559ff1db9dc010f2
+tornado==6.4.2
+tzdata==2024.2
+xyzservices==2024.9.0

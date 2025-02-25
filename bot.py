@@ -26,7 +26,7 @@ def get_real_data(startPoint, numBars, timeframe):
     return rates_df
 
 
-
+df4h = get_real_data(0,25000, mt5.TIMEFRAME_H4)
 df = get_real_data(0, 25000, mt5.TIMEFRAME_M15)
 df.drop(['real_volume'], axis=1, inplace=True)
 
@@ -226,14 +226,14 @@ def detect_liquidity_zones(df, liq_len, liq_mar, atr_period, mode='Present', vis
 
 def add_liquidity_zones(fig, b_liq_B, b_liq_S):
     for zone in b_liq_B:
-        fig.add_shape(type="rect",
-                      x0=zone['bx'][0], x1=zone['bx'][2], y0=zone['bx'][3], y1=zone['bx'][1],
+        fig.add_shape(type="line",
+                      x0=zone['bx'][0], x1=zone['bx'][2], y0=zone['bx'][3], y1=zone['bx'][3],
                       line=dict(color="purple", width=2),
                       fillcolor="purple", opacity=0.5)
     
     for zone in b_liq_S:
-        fig.add_shape(type="rect",
-                      x0=zone['bx'][0], x1=zone['bx'][2], y0=zone['bx'][3], y1=zone['bx'][1],
+        fig.add_shape(type="line",
+                      x0=zone['bx'][0], x1=zone['bx'][2], y0=zone['bx'][3], y1=zone['bx'][3],
                       line=dict(color="black", width=2),
                       fillcolor="black", opacity=0.5)
 
@@ -343,11 +343,14 @@ def plot_data(plotlist1, plotlist2, allFVG, orderBlock, df, b_liq_B, b_liq_S):
     s = 20000
     e = len(df)-3
     dfpl = df[s : e]
+
     fig = go.Figure(data=[go.Candlestick(x=dfpl.index,
                                         open=dfpl['open'],
                                         high=dfpl['high'],
                                         low=dfpl['low'],
                                         close=dfpl['close'])])
+    
+
 
     c=len(plotlist1)-10 #Number show
     while (1):
@@ -356,7 +359,7 @@ def plot_data(plotlist1, plotlist2, allFVG, orderBlock, df, b_liq_B, b_liq_S):
         fig.add_shape(type='line', x0=plotlist1[c][0], y0=plotlist1[c][1],
                     x1=e,
                     y1=plotlist1[c][1],
-                    line=dict(color="MediumPurple", width=1)
+                    line=dict(color="MediumPurple", width=3)
                     )#x0=sr[c][0]-5 x1=sr[c][0]+5
         c+=1
     c=len(plotlist2)-10 #Number show
@@ -366,7 +369,7 @@ def plot_data(plotlist1, plotlist2, allFVG, orderBlock, df, b_liq_B, b_liq_S):
         fig.add_shape(type='line', x0=plotlist2[c][0], y0=plotlist2[c][1],
                     x1=e,
                     y1=plotlist2[c][1],
-                    line=dict(color="RoyalBlue", width=1)
+                    line=dict(color="RoyalBlue", width=3)
                     )#x0=sr[c][0]-5 x1=sr[c][0]+5
         c+=1
     
@@ -423,17 +426,17 @@ def main():
     n1 = 4 #Candles before same color
     n2 = 3 #Candles after same color
 
-    for row in range(20000+n1, len(df)-n2):
-        if support(df, row, n1, n2):
-            if(df.close[row] < df.open[row]):
-                ss.append((row, df.open[row], 1))
+    for row in range(20000+n1, len(df4h)-n2):
+        if support(df4h, row, n1, n2):
+            if(df4h.close[row] < df4h.open[row]):
+                ss.append((row, df4h.open[row], 1))
             else:
-                ss.append((row, df.close[row], 1))
-        if resistance(df, row, n1, n2):
-            if(df.close[row] > df.open[row]):
-                ss.append((row, df.close[row], 2))
+                ss.append((row, df4h.close[row], 1))
+        if resistance(df4h, row, n1, n2):
+            if(df4h.close[row] > df4h.open[row]):
+                rr.append((row, df4h.close[row], 2))
             else:
-                rr.append((row, df.open[row], 2))
+                rr.append((row, df4h.open[row], 2))
     
     for row in range(20000, len(df)-1):
         if not FVG(df, row) == 0:
@@ -446,6 +449,8 @@ def main():
             ob.append((row, df.open[row], 2))
     st.title("Gold Resistance and support lines")
     st.subheader("Graph:")
+    st.subheader("Legenda")
+    st.write("Resistenze: \n Supporti: \n OrderBlock+: Linea gialla \n OrderBlock-: Linea rosa \n FVG+: Area verde \n FVG-: Area rossa Buyside Liquidity: Area viola \n Sellside Liquidity: Area nera \n Candle Pattern+: Linea verticale verde\n Candle Pattern-: Linea verticale rossa")
 
     # plotlist1 = [x[1] for x in sr if x[2] == 1] #Support
     # plotlist2 = [x[1] for x in sr if x[2] == 2] #Resistance
