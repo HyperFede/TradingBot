@@ -18,6 +18,6 @@ pytz==2024.2
 PyYAML==6.0.2
 six==1.17.0
 TA-Lib @ file:///C:/Users/feder/Documents/GitHub/TradingBot/TA_Lib-0.4.29-cp311-cp311-win_amd64.whl#sha256=aab5075b1c6f2482c80e4561bb44b888815ca41affe519ad559ff1db9dc010f2
-tornado==6.4.2
+tornado==6.5.1
 tzdata==2024.2
 xyzservices==2024.9.0
