@@ -1,0 +1,245 @@
+Metadata-Version: 2.1
+Name: ctrader-sdk
+Version: 0.1.1
+Summary: A Python package for interacting with the cTrader API for trading and data fetching.
+Home-page: https://github.com/Nils-Lopez/ctrader-sdk
+Author: Nils Lopez
+Author-email: lopez.nils@doctopus.app
+License: UNKNOWN
+Platform: UNKNOWN
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.6
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: pandas
+Requires-Dist: requests
+
+# cTrader SDK
+
+The `ctrader-sdk` package provides a simple interface to interact with the cTrader API for trading and data fetching. This package supports placing orders, modifying and canceling orders, fetching historical data, and retrieving account information.
+
+## Installation
+
+To install the package, you can use `pip`:
+
+```bash
+pip install ctrader-sdk
+```
+
+## Usage
+
+### Initialization
+
+First, initialize the `CTraderBot` class with your credentials:
+
+```python
+from ctrader_sdk import CTraderBot
+
+client_id = 'YOUR_CLIENT_ID'
+client_secret = 'YOUR_CLIENT_SECRET'
+access_token = 'YOUR_ACCESS_TOKEN'
+account_id = 'YOUR_ACCOUNT_ID'
+
+bot = CTraderBot(client_id, client_secret, access_token, account_id)
+```
+
+# Methods
+
+## place_order
+
+Place a buy or sell order.
+
+```python
+order_response = bot.place_order(
+    symbol='EURUSD',
+    volume=100000,
+    direction='BUY',
+    price=1.2000,
+    take_profit=1.2100,
+    stop_loss=1.1900
+)
+print(order_response)
+```
+
+### Parameters:
+
+symbol (str): The symbol to trade (e.g., 'EURUSD').
+volume (int): The volume of the trade.
+direction (str): 'BUY' or 'SELL'.
+order_type (str, optional): 'LIMIT' (default) or 'MARKET'.
+price (float, optional): The limit price for the order.
+take_profit (float, optional): The take profit price.
+stop_loss (float, optional): The stop loss price.
+
+## modify_order
+
+Modify an existing order.
+
+```python
+modify_response = bot.modify_order(
+    order_id='ORDER_ID',
+    price=1.2050
+)
+print(modify_response)
+```
+
+### Parameters:
+
+order_id (str): The ID of the order to modify.
+price (float, optional): The new limit price.
+take_profit (float, optional): The new take profit price.
+stop_loss (float, optional): The new stop loss price.
+
+## cancel_order
+
+Cancel an existing order.
+
+```python
+cancel_response = bot.cancel_order(order_id='ORDER_ID')
+print(cancel_response)
+```
+
+### Parameters:
+
+order_id (str): The ID of the order to cancel.
+
+## fetch_dataframe
+
+Fetch historical data as a pandas DataFrame.
+
+```python
+from datetime import datetime, timedelta
+
+start_time = datetime.now() - timedelta(days=7)
+end_time = datetime.now()
+
+df = bot.fetch_dataframe(
+    symbol='EURUSD',
+    start_time=start_time,
+    end_time=end_time,
+    timeframe='H1'
+)
+print(df)
+```
+
+### Parameters:
+
+symbol (str): The symbol to fetch data for (e.g., 'EURUSD').
+start_time (datetime): The start time for the data.
+end_time (datetime): The end time for the data.
+timeframe (str, optional): The timeframe for the data (default: 'H1').
+
+## get_account_equity
+
+Get the account equity.
+
+```python
+equity = bot.get_account_equity()
+print(f'Account Equity: {equity}')
+```
+
+### Parameters:
+
+None
+
+## get_account_information
+
+Fetch detailed account information.
+
+```python
+account_info = bot.get_account_information()
+print(account_info)
+```
+
+### Parameters:
+
+None
+
+## get_open_positions
+
+Fetch all open positions.
+
+```python
+positions = bot.get_open_positions()
+print(positions)
+```
+
+### Parameters:
+
+None
+
+## get_open_orders
+
+Fetch all open orders.
+
+```python
+    orders = bot.get_open_orders()
+    print(orders)
+```
+
+### Parameters:
+
+None
+
+## calculate_technical_indicators
+
+Calculate basic technical indicators.
+
+```python
+    df_with_indicators = bot.calculate_technical_indicators(df)
+    print(df_with_indicators)
+```
+
+### Parameters:
+
+df (pandas.DataFrame): The DataFrame containing historical data.
+
+## Error Handling
+
+The ctrader-sdk package includes basic error handling. If a request fails, an error message will be logged, and an exception will be raised.
+
+Example:
+
+```python
+try:
+    order_response = bot.place_order(
+        symbol='EURUSD',
+        volume=100000,
+        direction='BUY',
+        price=1.2000,
+        take_profit=1.2100,
+        stop_loss=1.1900
+    )
+except requests.exceptions.HTTPError as err:
+    print(f"HTTP error occurred: {err}")
+except Exception as err:
+    print(f"An error occurred: {err}")
+```
+
+## Logging
+
+The package uses the built-in logging module to log information and errors. By default, the logging level is set to INFO. You can customize the logging configuration as needed.
+
+```python
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
+```
+
+## Example Use Cases
+
+### Automated Trading Bot:
+
+-> Place, modify, and cancel orders programmatically.
+-> Fetch historical data for backtesting and strategy development.
+-> Calculate technical indicators for decision-making.
+
+### Data Analysis:
+
+-> Fetch historical data for multiple symbols.
+-> Calculate and analyze technical indicators.
+-> Monitor account equity and open positions.
+
+
