@@ -4,7 +4,7 @@ numpy
 plotly
 altair
 yfinance
-tvdatafeed
+git+https://github.com/yuvanesh-kumar/tvdatafeed.git
 ctrader-sdk
 ctrader_open_api
 curl_cffi
