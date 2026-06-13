@@ -1,11 +1,12 @@
 from math import floor
 
 class Position:
-    def __init__(self, entry_price, entry_time, entry_rsi, direction, tp=None, sl=None):
+    def __init__(self, entry_price, entry_time, entry_rsi, direction, case_reason, tp=None, sl=None):
         self.entry_price = entry_price
         self.entry_time = entry_time
         self.entry_rsi = entry_rsi
         self.direction = direction  # 'LONG' or 'SHORT'
+        self.case_reason = case_reason # 'Case 1' or 'Case 2'
         self.tp = tp
         self.sl = sl
 
@@ -21,7 +22,6 @@ class FVGStrategy:
     def evaluate_bar(self, row):
         """
         Evaluate a single bar/row for strategy logic.
-        Returns newly generated trade(s) if any closed during this bar.
         """
         closed_trades = []
         high = row['High']
@@ -29,44 +29,63 @@ class FVGStrategy:
         close = row['Close']
         
         # 1. Update Invalidation states for existing FVGs map
-        # Bearish: Invalidated if High >= FVG Top
         for f in self.open_bear_fvgs[:]:
             if high >= f['top']:
                 f['end_time'] = row.name
                 self.open_bear_fvgs.remove(f)
                 
-        # Bullish: Invalidated if Low <= FVG Bottom
         for f in self.open_bull_fvgs[:]:
             if low <= f['bottom']:
                 f['end_time'] = row.name
                 self.open_bull_fvgs.remove(f)
 
-        # 2. Add New FVGs to Maps
+        # Helper function for overlap rule
+        def is_overlap(fvg1, fvg2):
+            return max(fvg1['bottom'], fvg2['bottom']) <= min(fvg1['top'], fvg2['top'])
+
+        # 2. Add New FVGs to Maps & Apply Overlap Rule
         if row.get('is_bearish_fvg', False):
-            fvg = {
+            new_fvg = {
                 'type': 'bearish',
                 'top': row['bear_fvg_top'],
                 'bottom': row['bear_fvg_bottom'],
                 'size': row['bear_fvg_size'],
                 'start_time': row.name,
                 'end_time': None,
-                'traded': False
+                'traded': False,
+                'trade_case': None
             }
-            self.open_bear_fvgs.append(fvg)
-            self.all_fvg_log.append(fvg)
+            # Overlap Rule: discard older FVG if it overlaps
+            for old_fvg in self.open_bear_fvgs[:]:
+                if is_overlap(new_fvg, old_fvg):
+                    old_fvg['end_time'] = row.name
+                    self.open_bear_fvgs.remove(old_fvg)
+            
+            self.open_bear_fvgs.append(new_fvg)
+            if len(self.open_bear_fvgs) > 21:
+                self.open_bear_fvgs.pop(0) # Keep max 21 (1 Current + 20 Historical)
+            self.all_fvg_log.append(new_fvg)
             
         if row.get('is_bullish_fvg', False):
-            fvg = {
+            new_fvg = {
                 'type': 'bullish',
                 'top': row['bull_fvg_top'],
                 'bottom': row['bull_fvg_bottom'],
                 'size': row['bull_fvg_size'],
                 'start_time': row.name,
                 'end_time': None,
-                'traded': False
+                'traded': False,
+                'trade_case': None
             }
-            self.open_bull_fvgs.append(fvg)
-            self.all_fvg_log.append(fvg)
+            for old_fvg in self.open_bull_fvgs[:]:
+                if is_overlap(new_fvg, old_fvg):
+                    old_fvg['end_time'] = row.name
+                    self.open_bull_fvgs.remove(old_fvg)
+                    
+            self.open_bull_fvgs.append(new_fvg)
+            if len(self.open_bull_fvgs) > 21:
+                self.open_bull_fvgs.pop(0)
+            self.all_fvg_log.append(new_fvg)
 
         # 3. Manage Active Position
         if self.position is not None:
@@ -74,20 +93,17 @@ class FVGStrategy:
             exit_price = None
             exit_reason = None
             
-            # 3.1 Force close on Friday before market close (e.g. 20:00 / 8 PM)
             friday_close = (row.name.weekday() == 4 and row.name.hour >= 20)
             
-            # Check TP/SL Hits
             if self.position.direction == 'SHORT':
-                sl_hit = self.position.sl is not None and high >= self.position.sl
-                tp_hit = self.position.tp is not None and low <= self.position.tp
-                # Determine exits
+                sl_hit = high >= self.position.sl
+                tp_hit = low <= self.position.tp
+                
                 if friday_close:
                     exit_price = close
                     exit_reason = 'Friday Close'
                     trade_closed = True
                 elif sl_hit and tp_hit:
-                    # Worst case assignment
                     exit_price = self.position.sl
                     exit_reason = 'SL'
                     trade_closed = True
@@ -101,9 +117,9 @@ class FVGStrategy:
                     trade_closed = True
                     
             elif self.position.direction == 'LONG':
-                sl_hit = self.position.sl is not None and low <= self.position.sl
-                tp_hit = self.position.tp is not None and high >= self.position.tp
-                # Determine exits
+                sl_hit = low <= self.position.sl
+                tp_hit = high >= self.position.tp
+                
                 if friday_close:
                     exit_price = close
                     exit_reason = 'Friday Close'
@@ -121,7 +137,6 @@ class FVGStrategy:
                     exit_reason = 'TP'
                     trade_closed = True
                 
-            # Log Closed Trade
             if trade_closed:
                 if self.position.direction == 'SHORT':
                     pnl = (self.position.entry_price - exit_price) * self.position_size
@@ -130,6 +145,7 @@ class FVGStrategy:
                     
                 closed_trades.append({
                     'direction': self.position.direction,
+                    'case_reason': self.position.case_reason,
                     'entry_time': self.position.entry_time,
                     'entry_price': self.position.entry_price,
                     'exit_time': row.name,
@@ -138,69 +154,64 @@ class FVGStrategy:
                     'pnl': pnl
                 })
                 self.position = None
-            else:
-                # --- Dynamic SL Management ---
-                sma_slopes_down = (row.get('SMA_9_slope', 0) < 0) and (row.get('SMA_20_slope', 0) < 0)
-                sma_slopes_up = (row.get('SMA_9_slope', 0) > 0) and (row.get('SMA_20_slope', 0) > 0)
-                
-                if self.position.direction == 'SHORT':
-                    # Has price broken below the active Bearish FVG?
-                    # The FVG associated to this short was tracked, but we must use the most recent Unmitigated
-                    latest_bear = self.open_bear_fvgs[-1] if self.open_bear_fvgs else None
-                    if latest_bear and close < latest_bear['bottom']:
-                        if close < self.position.entry_price and row.get('RSI_14', 50) < self.position.entry_rsi and sma_slopes_down:
-                            new_sl = latest_bear['bottom'] + (0.35 * latest_bear['size'])
-                            if self.position.sl is None or new_sl < self.position.sl:
-                                self.position.sl = new_sl
-                                
-                elif self.position.direction == 'LONG':
-                    # Has price broken above the active Bullish FVG?
-                    latest_bull = self.open_bull_fvgs[-1] if self.open_bull_fvgs else None
-                    if latest_bull and close > latest_bull['top']:
-                        if close > self.position.entry_price and row.get('RSI_14', 50) > self.position.entry_rsi and sma_slopes_up:
-                            new_sl = latest_bull['top'] - (0.35 * latest_bull['size'])
-                            if self.position.sl is None or new_sl > self.position.sl:
-                                self.position.sl = new_sl
 
-        # 4. Check for Entries (if not in position)
+        # 4. Check for Entries (Strictly One Trade at a Time)
         if self.position is None:
-            # Check Short Entry
-            if len(self.open_bear_fvgs) > 0 and len(self.open_bull_fvgs) > 0:
-                latest_bear = self.open_bear_fvgs[-1]
-                entry_level_short = latest_bear['bottom'] + (0.25 * latest_bear['size'])
+            # Check Short Entries
+            # Iterate backwards (most recent first)
+            for idx, bear in enumerate(reversed(self.open_bear_fvgs)):
+                # idx == 0 is the most recent (Case 1), others are Case 2
+                is_case_1 = (idx == 0)
                 
-                if high >= entry_level_short and low <= entry_level_short:
-                    # Find highest unmitigated Bullish FVG below entry
-                    lower_bulls = [f['top'] for f in self.open_bull_fvgs if f['top'] < entry_level_short]
-                    if lower_bulls: # Only trigger if an opposing valid TP exists
-                        tp_level = max(lower_bulls)
-                        self.position = Position(
-                            entry_price=entry_level_short,
-                            entry_time=row.name,
-                            entry_rsi=row.get('RSI_14', 50),
-                            direction='SHORT',
-                            tp=tp_level
-                        )
-                        latest_bear['traded'] = True
+                # Condition: Price touches lower band of Bearish FVG
+                if high >= bear['bottom']:
+                    entry_price = bear['bottom']
+                    sl = bear['top'] + 5
+                    # Cap SL risk to $50
+                    if sl - entry_price > 50:
+                        sl = entry_price + 50
+                    # TP at 2.0 RR
+                    tp = entry_price - 2 * (sl - entry_price)
+                    
+                    self.position = Position(
+                        entry_price=entry_price,
+                        entry_time=row.name,
+                        entry_rsi=row.get('RSI_14', 50),
+                        direction='SHORT',
+                        case_reason='Case 1' if is_case_1 else 'Case 2',
+                        tp=tp,
+                        sl=sl
+                    )
+                    bear['traded'] = True
+                    bear['trade_case'] = self.position.case_reason
+                    break # Position filled, stop searching
 
-            # Check Long Entry
-            # We allow multiple entry conditionals per bar, it'll pick the first executed if both crossed
-            if self.position is None and len(self.open_bull_fvgs) > 0 and len(self.open_bear_fvgs) > 0:
-                latest_bull = self.open_bull_fvgs[-1]
-                entry_level_long = latest_bull['top'] - (0.25 * latest_bull['size'])
+        if self.position is None:
+            # Check Long Entries
+            for idx, bull in enumerate(reversed(self.open_bull_fvgs)):
+                is_case_1 = (idx == 0)
                 
-                if low <= entry_level_long and high >= entry_level_long:
-                    # Find lowest unmitigated Bearish FVG above entry
-                    higher_bears = [f['bottom'] for f in self.open_bear_fvgs if f['bottom'] > entry_level_long]
-                    if higher_bears: # Only trigger if an opposing valid TP exists
-                        tp_level = min(higher_bears)
-                        self.position = Position(
-                            entry_price=entry_level_long,
-                            entry_time=row.name,
-                            entry_rsi=row.get('RSI_14', 50),
-                            direction='LONG',
-                            tp=tp_level
-                        )
-                        latest_bull['traded'] = True
+                # Condition: Price touches upper band of Bullish FVG
+                if low <= bull['top']:
+                    entry_price = bull['top']
+                    sl = bull['bottom'] - 5
+                    # Cap SL risk to $50
+                    if entry_price - sl > 50:
+                        sl = entry_price - 50
+                    # TP at 2.0 RR
+                    tp = entry_price + 2 * (entry_price - sl)
+                    
+                    self.position = Position(
+                        entry_price=entry_price,
+                        entry_time=row.name,
+                        entry_rsi=row.get('RSI_14', 50),
+                        direction='LONG',
+                        case_reason='Case 1' if is_case_1 else 'Case 2',
+                        tp=tp,
+                        sl=sl
+                    )
+                    bull['traded'] = True
+                    bull['trade_case'] = self.position.case_reason
+                    break
 
         return closed_trades

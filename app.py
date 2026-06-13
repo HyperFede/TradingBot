@@ -101,14 +101,28 @@ if df is not None and trades is not None:
 
     # Plot Trades
     if total_trades > 0:
+        shorts = trades[trades['direction'] == 'SHORT']
+        longs = trades[trades['direction'] == 'LONG']
+        
         # Entry points (Short -> Red triangle down)
-        fig.add_trace(go.Scatter(
-            x=trades['entry_time'],
-            y=trades['entry_price'] + (df['High'].mean() * 0.001), # slightly above
-            mode='markers',
-            marker=dict(symbol='triangle-down', size=10, color='red'),
-            name='Short Entry'
-        ), row=1, col=1)
+        if not shorts.empty:
+            fig.add_trace(go.Scatter(
+                x=shorts['entry_time'],
+                y=shorts['entry_price'] + (df['High'].mean() * 0.001), # slightly above
+                mode='markers',
+                marker=dict(symbol='triangle-down', size=10, color='red'),
+                name='Short Entry'
+            ), row=1, col=1)
+            
+        # Entry points (Long -> Green triangle up)
+        if not longs.empty:
+            fig.add_trace(go.Scatter(
+                x=longs['entry_time'],
+                y=longs['entry_price'] - (df['High'].mean() * 0.001), # slightly below
+                mode='markers',
+                marker=dict(symbol='triangle-up', size=10, color='green'),
+                name='Long Entry'
+            ), row=1, col=1)
         
         # Exit points
         profits = trades[trades['pnl'] > 0]
@@ -131,7 +145,7 @@ if df is not None and trades is not None:
                 y=losses['exit_price'],
                 mode='markers',
                 marker=dict(symbol='x', size=8, color='red', line=dict(color='black', width=1)),
-                name='SL Exit'
+                name='SL / Loss Exit'
             ), row=1, col=1)
 
         # Plot ALL FVGs from the log
@@ -149,6 +163,20 @@ if df is not None and trades is not None:
                     line_color = "rgba(0, 200, 0, 0.8)" if fvg['type'] == 'bullish' else "rgba(200, 0, 0, 0.8)"
                     dash_style = "solid"
                     line_width = 2
+                    
+                    # Annotate the trade case
+                    trade_case = fvg.get('trade_case', 'Traded')
+                    fig.add_annotation(
+                        x=fvg['start_time'],
+                        y=fvg['top'] if fvg['type'] == 'bearish' else fvg['bottom'],
+                        text=trade_case,
+                        showarrow=False,
+                        xanchor="left",
+                        yanchor="bottom" if fvg['type'] == 'bearish' else "top",
+                        font=dict(color="white", size=10),
+                        bgcolor=line_color,
+                        row=1, col=1
+                    )
                     
                 fig.add_shape(
                     type="rect",
@@ -170,5 +198,5 @@ if df is not None and trades is not None:
     # -- Trade Log --
     st.subheader("Trade Log")
     if total_trades > 0:
-        display_cols = ['entry_time', 'exit_time', 'entry_price', 'exit_price', 'exit_reason', 'pnl']
+        display_cols = ['entry_time', 'exit_time', 'direction', 'case_reason', 'entry_price', 'exit_price', 'exit_reason', 'pnl']
         st.dataframe(trades[display_cols].sort_values(by='entry_time', ascending=False), use_container_width=True)
