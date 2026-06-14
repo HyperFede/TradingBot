@@ -3,7 +3,7 @@ from data_loader import DataLoader
 from indicators import add_all_indicators
 from strategy import FVGStrategy
 
-def run_backtest(symbol="XAUUSD", interval="1h", period="300d", position_size=0.01):
+def run_backtest(symbol="XAUUSD", interval="1h", period="300d"):
     """
     Run the full backtest.
     Returns:
@@ -18,8 +18,8 @@ def run_backtest(symbol="XAUUSD", interval="1h", period="300d", position_size=0.
     # 2. Compute Indicators
     df = add_all_indicators(df)
     
-    # 3. Simulate Strategy
-    strategy = FVGStrategy(position_size=position_size)
+    # 3. Simulate Strategy with strictly fixed lot size
+    strategy = FVGStrategy(position_size=0.01)
     all_trades = []
     
     # Loop over bars

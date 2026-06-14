@@ -16,7 +16,9 @@ st.markdown("Analyzing 1H Timeframe using dynamic Stop Loss management and RSI/S
 st.sidebar.header("Settings")
 symbol = st.sidebar.text_input("Symbol (TradingView Live Feed)", "XAUUSD")
 period = st.sidebar.selectbox("Period", ["100d", "200d", "300d", "400d"], index=2)
-position_size = st.sidebar.number_input("Position Size", value=0.01, step=0.01)
+# Fixed position size as strictly 0.01 lots
+position_size = 0.01
+st.sidebar.markdown(f"**Position Size:** {position_size} (Fixed)")
 initial_capital = st.sidebar.number_input("Initial Capital ($)", value=1000.0, step=100.0)
 run_btn = st.sidebar.button("Run Backtest")
 
@@ -28,7 +30,7 @@ if 'df' not in st.session_state:
 if run_btn or st.session_state.df is None:
     with st.spinner("Fetching Live OANDA:XAUUSD Data from TradingView and running backtester..."):
         try:
-            df, trades, fvg_log = run_backtest(symbol=symbol, interval=period, period=period, position_size=position_size)
+            df, trades, fvg_log = run_backtest(symbol=symbol, interval=period, period=period)
             st.session_state.df = df
             st.session_state.trades = trades
             st.session_state.fvgs = fvg_log
@@ -170,5 +172,5 @@ if df is not None and trades is not None:
     # -- Trade Log --
     st.subheader("Trade Log")
     if total_trades > 0:
-        display_cols = ['entry_time', 'exit_time', 'entry_price', 'exit_price', 'exit_reason', 'pnl']
+        display_cols = ['entry_time', 'exit_time', 'direction', 'entry_price', 'exit_price', 'exit_reason', 'pnl']
         st.dataframe(trades[display_cols].sort_values(by='entry_time', ascending=False), use_container_width=True)
